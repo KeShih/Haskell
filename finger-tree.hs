@@ -4,7 +4,7 @@
 
 import Data.Binary.Get (isEmpty)
 import Data.Sequence ()
-import Prelude hiding (Monoid)
+import Prelude hiding (Monoid, length, splitAt)
 
 -- lift binary function to a reduce function
 -- class Reduce f where
@@ -258,7 +258,7 @@ data ViewL s a = NilL | ConsL a (s a)
 viewL :: (Measured a v) => FingerTree v a -> ViewL (FingerTree v) a
 viewL Empty = NilL
 viewL (Single x) = ConsL x Empty
-viewL (Deep _ pr m sf) = ConsL (head pr) (deepL (tail pr) m sf)
+viewL (Deep _ (p : pf) m sf) = ConsL p (deepL pf m sf)
 
 deepL :: (Measured a v) => [a] -> FingerTree v (Node v a) -> Digit a -> FingerTree v a
 deepL [] m sf = case viewL m of
@@ -272,7 +272,7 @@ data ViewR s a = NilR | ConsR (s a) a
 viewR :: (Measured a v) => FingerTree v a -> ViewR (FingerTree v) a
 viewR Empty = NilR
 viewR (Single x) = ConsR Empty x
-viewR (Deep _ pr m sf) = ConsR (deepR pr m (tail sf)) (last sf)
+viewR (Deep _ pr m sf) = ConsR (deepR pr m (init sf)) (last sf)
 
 deepR :: (Measured a v) => Digit a -> FingerTree v (Node v a) -> [a] -> FingerTree v a
 deepR pr m [] = case viewR m of
@@ -379,9 +379,15 @@ instance Monoid Size where
   (#) = Size 0
   Size x <+> Size y = Size (x + y)
 
-newtype Elem a = Elem {getElem :: a} deriving (Eq, Ord, Show)
+newtype Elem a = Elem {getElem :: a} deriving (Eq, Ord)
 
 newtype Seq a = Seq (FingerTree Size (Elem a))
+
+instance (Show a) => Show (Elem a) where
+  show (Elem x) = show x
+
+instance (Show a) => Show (Seq a) where
+  show (Seq xs) = show (toList xs)
 
 instance (Measured (Elem a) Size) where
   measure (Elem _) = Size 1
@@ -419,3 +425,14 @@ extractMax :: (Ord a) => PQueue a -> (a, PQueue a)
 extractMax (PQueue xs) = (x, PQueue (l |><| r))
   where
     Split l (Elem x) r = splitTree (measure xs <=) (#) xs
+
+main :: IO ()
+-- test Seq
+main = do
+  let xs = Seq $ toTree [Elem 1, Elem 2, Elem 3, Elem 4, Elem 5]
+  print $ length xs
+  print (xs ! 2)
+  let (l, r) = splitAt 2 xs
+  print l
+  print r
+  print 1
