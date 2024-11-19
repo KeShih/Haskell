@@ -1,158 +1,11 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Eta reduce" #-}
 
 import Data.Binary.Get (isEmpty)
 import Data.Sequence ()
 import Prelude hiding (Monoid, length, splitAt)
 
--- lift binary function to a reduce function
--- class Reduce f where
--- reducer :: (a -> b -> b) -> f a -> b -> b
--- reducel :: (b -> a -> b) -> b -> f a -> b
-
--- instance Reduce [] where
---   reducer f xs z = foldr f z xs
---   reducel f z xs = foldl f z xs
-
--- toList :: (Reduce f) => f a -> [a]
--- toList s = reducer (:) s []
-
--- -- 2-3 tree
--- data Tree a = Zero a | Succ (Tree (Node a))
-
--- -- data Node a = Node2 a a | Node3 a a a
-
--- data FingerTree a
---   = Empty
---   | Single a
---   | Deep (Digit a) (FingerTree (Node a)) (Digit a)
-
-type Digit = []
-
--- instance Reduce Node where
---   reducer f (Node2 a b) z = f a (f b z)
---   reducer f (Node3 a b c) z = f a (f b (f c z))
---   reducel f z (Node2 a b) = f (f z a) b
---   reducel f z (Node3 a b c) = f (f (f z a) b) c
-
--- instance Reduce FingerTree where
---   reducer f Empty z = z
---   reducer f (Single x) z = f x z
---   reducer f (Deep pr m sf) z = f1 pr (f2 m (f1 sf z))
---     where
---       f1 = reducer f
---       f2 = reducer (reducer f)
---   reducel f z Empty = z
---   reducel f z (Single x) = f z x
---   reducel f z (Deep pr m sf) = f1 (f2 (f1 z pr) m) sf
---     where
---       f1 = reducel f
---       f2 = reducel (reducel f)
-
--- infixr 5 <|
-
--- (<|) :: a -> FingerTree a -> FingerTree a
--- a <| Empty = Single a
--- a <| Single b = Deep [a] Empty [b]
--- a <| Deep [b, c, d, e] m sf = Deep [a, b] (Node3 c d e <| m) sf
--- a <| Deep pr m sf = Deep ([a] ++ pr) m sf
-
--- infixl 5 |>
-
--- (|>) :: FingerTree a -> a -> FingerTree a
--- Empty |> a = Single a
--- Single a |> b = Deep [a] Empty [b]
--- Deep pr m [a, b, c, d] |> e = Deep pr (m |> Node3 a b c) [d, e]
--- Deep pr m sf |> a = Deep pr m (sf ++ [a])
-
--- -- lift |> and <|
--- infixr 5 <<|
-
--- (<<|) :: (Reduce f) => f a -> FingerTree a -> FingerTree a
--- (<<|) = reducer (<|)
-
--- infixl 5 |>>
-
--- (|>>) :: (Reduce f) => FingerTree a -> f a -> FingerTree a
--- (|>>) = reducel (|>)
-
--- toTree :: (Reduce f) => f a -> FingerTree a
--- toTree s = s <<| Empty
-
--- -- view from left
--- data ViewL s a = NilL | ConsL a (s a)
-
--- viewL :: FingerTree a -> ViewL FingerTree a
--- viewL Empty = NilL
--- viewL (Single x) = ConsL x Empty
--- viewL (Deep pr m sf) = ConsL (head pr) (deepL (tail pr) m sf)
-
--- deepL :: [a] -> FingerTree (Node a) -> Digit a -> FingerTree a
--- deepL [] m sf = case viewL m of
---   NilL -> toTree sf
---   ConsL a m' -> Deep (toList a) m' sf
--- deepL pr m sf = Deep pr m sf
-
--- isEmpty :: FingerTree a -> Bool
--- isEmpty x = case viewL x of
---   NilL -> True
---   ConsL _ _ -> False
-
--- headL :: FingerTree a -> a
--- headL x = case viewL x of
---   NilL -> error "empty"
---   ConsL a _ -> a
-
--- tailL :: FingerTree a -> FingerTree a
--- tailL x = case viewL x of
---   NilL -> error "empty"
---   ConsL _ s -> s
-
--- -- view from right
--- data ViewR s a = NilR | ConsR (s a) a
-
--- viewR :: FingerTree a -> ViewR FingerTree a
--- viewR Empty = NilR
--- viewR (Single x) = ConsR Empty x
--- viewR (Deep pr m sf) = ConsR (deepR pr m (tail sf)) (last sf)
-
--- deepR :: Digit a -> FingerTree (Node a) -> [a] -> FingerTree a
--- deepR pr m [] = case viewR m of
---   NilR -> toTree pr
---   ConsR m' a -> Deep pr m' (toList a)
--- deepR pr m sf = Deep pr m sf
-
--- headR :: FingerTree a -> a
--- headR x = case viewR x of
---   NilR -> error "empty"
---   ConsR _ a -> a
-
--- tailR :: FingerTree a -> FingerTree a
--- tailR x = case viewR x of
---   NilR -> error "empty"
---   ConsR s _ -> s
-
--- -- build middle tree from two trees
--- app3 :: FingerTree a -> [a] -> FingerTree a -> FingerTree a
--- app3 Empty ts xs = ts <<| xs
--- app3 xs ts Empty = xs |>> ts
--- app3 (Single x) ts xs = x <| (ts <<| xs)
--- app3 xs ts (Single x) = (xs |>> ts) |> x
--- app3 (Deep pr1 m1 sf1) ts (Deep pr2 m2 sf2) =
---   Deep pr1 (app3 m1 (nodes (sf1 ++ ts ++ pr2)) m2) sf2
-
--- nodes :: [a] -> [Node a]
--- nodes [a, b] = [Node2 a b]
--- nodes [a, b, c] = [Node3 a b c]
--- nodes [a, b, c, d] = [Node2 a b, Node2 c d]
--- nodes (a : b : c : xs) = Node3 a b c : nodes xs
-
--- -- concat two trees
--- (|><|) :: FingerTree a -> FingerTree a -> FingerTree a
--- xs |><| ys = app3 xs [] ys
-
--- measure
+type Digit a = [a]
 
 class Monoid v where
   (#) :: v
@@ -203,6 +56,7 @@ infixl 5 |>
 Empty |> a = Single a
 Single a |> b = deep [a] Empty [b]
 Deep _ pr m [a, b, c, d] |> e = deep pr (m |> node3 a b c) [d, e]
+Deep _ pr m sf |> a = deep pr m (sf ++ [a])
 
 -- reduce
 
@@ -306,12 +160,10 @@ tailR x = case viewR x of
 app3 :: (Measured a v) => FingerTree v a -> [a] -> FingerTree v a -> FingerTree v a
 app3 Empty ts xs = ts <<| xs
 app3 xs ts Empty = xs |>> ts
-app3 (Single x) ts xs = x <| (ts <<| xs)
-app3 xs ts (Single x) = (xs |>> ts) |> x
+app3 (Single x) ts xs = x <| ts <<| xs
+app3 xs ts (Single x) = xs |>> ts |> x
 app3 (Deep _ pr1 m1 sf1) ts (Deep _ pr2 m2 sf2) =
-  Deep v pr1 (app3 m1 (nodes (sf1 ++ ts ++ pr2)) m2) sf2
-  where
-    v = measure pr1 <+> measure m1 <+> measure sf1
+  deep pr1 (app3 m1 (nodes (sf1 ++ ts ++ pr2)) m2) sf2
 
 nodes :: (Measured a v) => [a] -> [Node v a]
 nodes [a, b] = [node2 a b]
@@ -339,14 +191,14 @@ splitTree p i (Single x) = Split Empty x Empty
 splitTree p i (Deep _ pr m sf)
   | p vpr =
       let Split l x r = splitDigit p i pr
-       in Split (toTree l) x (deep r m sf)
+       in Split (toTree l) x (deepL r m sf)
   | p vm =
       let Split ml xs mr = splitTree p vpr m
           Split l x r = splitDigit p (vpr <+> measure ml) (toList xs)
-       in Split (deep pr ml l) x (deep r mr sf)
+       in Split (deepR pr ml l) x (deepL r mr sf)
   | otherwise =
       let Split l x r = splitDigit p vm sf
-       in Split (deep pr m l) x (toTree r)
+       in Split (deepR pr m l) x (toTree r)
   where
     vpr = i <+> measure pr
     vm = vpr <+> measure m
@@ -426,9 +278,76 @@ extractMax (PQueue xs) = (x, PQueue (l |><| r))
   where
     Split l (Elem x) r = splitTree (measure xs <=) (#) xs
 
-main :: IO ()
--- test Seq
-main = do
+-- ordered sequence
+data Key a = NoKey | Key a deriving (Eq, Ord)
+
+instance Monoid (Key a) where
+  (#) = NoKey
+  k <+> NoKey = k
+  _ <+> k = k
+
+newtype OrdSeq a = OrdSeq (FingerTree (Key a) (Elem a))
+
+instance (Show a) => Show (OrdSeq a) where
+  show (OrdSeq xs) = show (toList xs)
+
+instance Measured (Elem a) (Key a) where
+  measure (Elem x) = Key x
+
+partition :: (Ord a) => a -> OrdSeq a -> (OrdSeq a, OrdSeq a)
+partition k (OrdSeq xs) = (OrdSeq l, OrdSeq r)
+  where
+    (l, r) = split (>= Key k) xs
+
+insert :: (Ord a) => a -> OrdSeq a -> OrdSeq a
+insert k (OrdSeq xs) = OrdSeq ((l |> Elem k) |><| r)
+  where
+    (l, r) = split (>= Key k) xs
+
+deleteAll :: (Ord a) => a -> OrdSeq a -> OrdSeq a
+deleteAll x (OrdSeq xs) = OrdSeq (l1 |><| r2)
+  where
+    (l1, r1) = split (>= Key x) xs
+    (l2, r2) = split (> Key x) r1
+
+merge :: (Ord a) => OrdSeq a -> OrdSeq a -> OrdSeq a
+merge (OrdSeq xs) (OrdSeq ys) = OrdSeq (merge' xs ys)
+  where
+    merge' xs ys = case viewL ys of
+      NilL -> xs
+      ConsL y ys' -> l |><| (y <| merge' ys' r)
+        where
+          (l, r) = split (> measure y) xs
+
+-- test OrdSeq
+
+testOrdSeq :: IO ()
+testOrdSeq = do
+  let xs = OrdSeq $ toTree [Elem 1, Elem 2, Elem 3, Elem 4, Elem 6]
+  print xs
+  let (l, r) = partition 3 xs
+  print l
+  print r
+  let xs2 = insert 5 xs
+  let xs3 = insert 5 xs2
+  print xs3
+  let xs4 = deleteAll 3 xs3
+  print xs4
+  let xs5 = deleteAll 5 xs4
+  print xs5
+  let xs6 = deleteAll 2 xs5
+  print xs6
+  let xs7 = deleteAll 1 xs6
+  print xs7
+  let xs8 = deleteAll 6 xs7
+  print xs8
+  let xs9 = deleteAll 4 xs8
+  print xs9
+  let ys = OrdSeq $ toTree [Elem 1, Elem 1, Elem 4, Elem 5, Elem 14]
+  print $ merge xs ys
+
+testSeq :: IO ()
+testSeq = do
   let xs = Seq $ toTree [Elem 1, Elem 2, Elem 3, Elem 4, Elem 5]
   print $ length xs
   print (xs ! 2)
@@ -436,3 +355,9 @@ main = do
   print l
   print r
   print 1
+
+main :: IO ()
+main = do
+  testOrdSeq
+
+-- testSeq
