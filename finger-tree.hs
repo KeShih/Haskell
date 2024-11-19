@@ -323,11 +323,13 @@ merge (OrdSeq xs) (OrdSeq ys) = OrdSeq (merge' xs ys)
 intersect :: (Ord a) => OrdSeq a -> OrdSeq a -> OrdSeq a
 intersect (OrdSeq xs) (OrdSeq ys) = OrdSeq (intersect' xs ys)
   where
-    intersect' xs ys = case viewL ys of
-      NilL -> Empty
-      ConsL y ys' -> case lookupTree (>= measure y) (#) xs of
-        (NoKey, _) -> intersect' xs ys'
-        (k, x) -> x <| intersect' (dropUntil (>= k) xs) ys'
+    intersect' xs ys = case (viewL xs, viewL ys) of
+      (NilL, _) -> Empty
+      (_, NilL) -> Empty
+      (ConsL x xs', ConsL y ys')
+        | x == y -> x <| intersect' xs' ys'
+        | x < y -> intersect' xs' ys
+        | otherwise -> intersect' xs ys'
 
 -- test OrdSeq
 
@@ -355,7 +357,7 @@ testOrdSeq = do
   print xs9
   let ys = OrdSeq $ toTree [Elem 1, Elem 1, Elem 4, Elem 5, Elem 14]
   print $ merge xs ys
-  print $ intersect xs ys
+  print $ intersect ys ys
 
 testSeq :: IO ()
 testSeq = do
